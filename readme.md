@@ -1,3 +1,5 @@
+[![Video](https://img.youtube.com/vi/aYgKZSq4AZs/0.jpg)](https://www.youtube.com/watch?v=aYgKZSq4AZs)
+
 # Panorama Processing for InvokeAI
 
 This package provides a growing set of tools for processing panoramic images within the InvokeAI framework. It enables conversion between equirectangular, cubemap, and cross-layout formats, with experimental support for both HDR and LDR image processing.
@@ -45,9 +47,6 @@ Before
 ![Screenshot 1](images/2.jpg)
 After
 ![Screenshot 2](images/1.jpg)
-
-## Youtube Video
-[![Video](https://img.youtube.com/vi/aYgKZSq4AZs/0.jpg)](https://www.youtube.com/watch?v=aYgKZSq4AZs)
 
 ## Technical Details
 
