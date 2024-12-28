@@ -33,6 +33,8 @@ class EquirectangularToCubemapCrossInvocation(BaseInvocation):
         default=1024, ge=64, le=4096, description="Size of each cubemap face")
     exposure: float = InputField(
         default=0.0, ge=-10.0, le=10.0, description="Exposure adjustment for tone mapping")
+    rotation: float = InputField(default=0.0, ge=-180.0, le=180.0,
+                                 description="Rotation angle around vertical axis in degrees")
 
     # Anti-aliasing options
     use_bilinear: bool = InputField(
@@ -164,21 +166,93 @@ class EquirectangularToCubemapCrossInvocation(BaseInvocation):
 
         return result
 
-    def process_face_parallel(self,
-                              face_name: str,
-                              equirect: np.ndarray,
-                              face_size: int,
-                              batch_size: int = 32) -> np.ndarray:
-        """Process a single cubemap face with batched operations
+    # def process_face_parallel(self,
+    #                           face_name: str,
+    #                           equirect: np.ndarray,
+    #                           face_size: int,
+    #                           batch_size: int = 32) -> np.ndarray:
+    #     """Process a single cubemap face with batched operations
 
-        Divides the face into batches for efficient processing and memory usage.
-        Handles coordinate generation and remapping for a complete face.
-        """
+    #     Divides the face into batches for efficient processing and memory usage.
+    #     Handles coordinate generation and remapping for a complete face.
+    #     """
+    #     # Generate base coordinates for this face
+    #     xs, ys = np.meshgrid(
+    #         np.linspace(-1, 1, face_size),
+    #         np.linspace(-1, 1, face_size)
+    #     )
+
+    #     # Convert face coordinates to 3D vectors based on face orientation
+    #     if face_name == 'front':
+    #         x, y, z = -xs, ys, np.ones_like(xs)
+    #     elif face_name == 'back':
+    #         x, y, z = xs, ys, -np.ones_like(xs)
+    #     elif face_name == 'right':
+    #         x, y, z = -np.ones_like(xs), ys, -xs
+    #     elif face_name == 'left':
+    #         x, y, z = np.ones_like(xs), ys, xs
+    #     elif face_name == 'up':
+    #         x, y, z = -xs, -np.ones_like(xs), ys
+    #     elif face_name == 'down':
+    #         x, y, z = -xs, np.ones_like(xs), -ys
+
+    #     # Convert to spherical coordinates
+    #     theta = np.arctan2(z, x)
+    #     phi = np.arctan2(y, np.sqrt(x**2 + z**2))
+
+    #     # Convert to equirectangular coordinates
+    #     u = (theta + np.pi) / (2 * np.pi)
+    #     v = (phi + np.pi/2) / np.pi
+
+    #     # Convert to pixel coordinates
+    #     h, w = equirect.shape[:2]
+    #     x_map = (u * (w - 1)).astype(np.float32)
+    #     y_map = (v * (h - 1)).astype(np.float32)
+
+    #     # Process in batches
+    #     face = np.zeros(
+    #         (face_size, face_size, equirect.shape[2]), dtype=np.float32)
+    #     num_pixels = face_size * face_size
+    #     num_batches = (num_pixels + batch_size - 1) // batch_size
+
+    #     for i in range(num_batches):
+    #         start_idx = i * batch_size
+    #         end_idx = min((i + 1) * batch_size, num_pixels)
+
+    #         # Extract batch coordinates
+    #         x_batch = x_map.ravel()[start_idx:end_idx].reshape(-1, 1)
+    #         y_batch = y_map.ravel()[start_idx:end_idx].reshape(-1, 1)
+
+    #         # Process batch
+    #         result_batch = self.process_batch(
+    #             equirect,
+    #             x_batch,
+    #             y_batch
+    #         )
+
+    #         # Store results
+    #         face.ravel()[start_idx*3:end_idx*3] = result_batch.ravel()
+
+    #     return face
+
+    def apply_rotation_matrix(self, x: np.ndarray, y: np.ndarray, z: np.ndarray, angle_degrees: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Apply rotation around the Y (up) axis to the coordinate system"""
+        angle_rad = np.radians(angle_degrees)
+        cos_angle = np.cos(angle_rad)
+        sin_angle = np.sin(angle_rad)
+
+        # Rotation matrix for Y-axis rotation
+        x_rot = x * cos_angle + z * sin_angle
+        y_rot = y  # Y coordinates don't change for Y-axis rotation
+        z_rot = -x * sin_angle + z * cos_angle
+
+        return x_rot, y_rot, z_rot
+
+    def process_face_parallel(self, face_name: str, equirect: np.ndarray, face_size: int, rotation_angle: float, batch_size: int = 32) -> np.ndarray:
+        """Process a single cubemap face with batched operations and rotation support"""
         # Generate base coordinates for this face
-        xs, ys = np.meshgrid(
-            np.linspace(-1, 1, face_size),
-            np.linspace(-1, 1, face_size)
-        )
+        xs, ys = np.meshgrid(np.linspace(-1, 1, face_size),
+                             np.linspace(-1, 1, face_size))
 
         # Convert face coordinates to 3D vectors based on face orientation
         if face_name == 'front':
@@ -194,6 +268,9 @@ class EquirectangularToCubemapCrossInvocation(BaseInvocation):
         elif face_name == 'down':
             x, y, z = -xs, np.ones_like(xs), -ys
 
+        # Apply rotation to the coordinates
+        x, y, z = self.apply_rotation_matrix(x, y, z, rotation_angle)
+
         # Convert to spherical coordinates
         theta = np.arctan2(z, x)
         phi = np.arctan2(y, np.sqrt(x**2 + z**2))
@@ -207,7 +284,7 @@ class EquirectangularToCubemapCrossInvocation(BaseInvocation):
         x_map = (u * (w - 1)).astype(np.float32)
         y_map = (v * (h - 1)).astype(np.float32)
 
-        # Process in batches
+        # Process in batches using existing GPU/CPU optimizations
         face = np.zeros(
             (face_size, face_size, equirect.shape[2]), dtype=np.float32)
         num_pixels = face_size * face_size
@@ -217,18 +294,10 @@ class EquirectangularToCubemapCrossInvocation(BaseInvocation):
             start_idx = i * batch_size
             end_idx = min((i + 1) * batch_size, num_pixels)
 
-            # Extract batch coordinates
             x_batch = x_map.ravel()[start_idx:end_idx].reshape(-1, 1)
             y_batch = y_map.ravel()[start_idx:end_idx].reshape(-1, 1)
 
-            # Process batch
-            result_batch = self.process_batch(
-                equirect,
-                x_batch,
-                y_batch
-            )
-
-            # Store results
+            result_batch = self.process_batch(equirect, x_batch, y_batch)
             face.ravel()[start_idx*3:end_idx*3] = result_batch.ravel()
 
         return face
@@ -254,6 +323,7 @@ class EquirectangularToCubemapCrossInvocation(BaseInvocation):
                         face_name,
                         equirect,
                         face_size,
+                        self.rotation,
                         self.batch_size
                     ): face_name for face_name in face_names
                 }
@@ -274,6 +344,7 @@ class EquirectangularToCubemapCrossInvocation(BaseInvocation):
                     face_name,
                     equirect,
                     face_size,
+                    self.rotation,
                     self.batch_size
                 )
 
