@@ -1,6 +1,6 @@
 # Panorama Processing for InvokeAI
 
-This package provides a comprehensive set of tools for processing panoramic images within the InvokeAI framework. It enables conversion between equirectangular, cubemap, and cross-layout formats, with support for both HDR and LDR image processing.
+This package provides a growing set of tools for processing panoramic images within the InvokeAI framework. It enables conversion between equirectangular, cubemap, and cross-layout formats, with experimental support for both HDR and LDR image processing.
 
 ## Features
 
@@ -34,82 +34,17 @@ pip install numpy pillow opencv-python openexr
 For GPU acceleration, ensure you have CUDA support installed with OpenCV.
 
 ## Usage
+Workflow view. Convert to/from Equirectangular/Cubemap Cross
+![Screenshot 3](images/3.jpg)
 
-### Basic Conversion Examples
+Canvas view. Edit the image without distortion
+![Screenshot 4](images/4.jpg)
+![Screenshot 5](images/5.jpg)
 
-1. Converting Equirectangular to Cubemap:
-
-```python
-from invokeai.app.invocations.panorama import EquirectangularToCubemapInvocation
-
-invocation = EquirectangularToCubemapInvocation(
-    image=your_image,
-    face_size=1024,
-    exposure=0.0
-)
-result = invocation.invoke(context)
-```
-
-2. Converting Equirectangular to Cross Layout:
-
-```python
-from invokeai.app.invocations.panorama import EquirectangularToCubemapCrossInvocation
-
-invocation = EquirectangularToCubemapCrossInvocation(
-    image=your_image,
-    face_size=1024,
-    exposure=0.0,
-    use_bilinear=True,
-    use_supersampling=True,
-    supersampling_rate=2
-)
-result = invocation.invoke(context)
-```
-
-3. Converting Cross Layout back to Equirectangular:
-
-```python
-from invokeai.app.invocations.panorama import CubemapCrossToEquirectangularInvocation
-
-invocation = CubemapCrossToEquirectangularInvocation(
-    image=your_image,
-    output_width=4096,
-    output_height=2048
-)
-result = invocation.invoke(context)
-```
-
-4. Converting LDR to HDR:
-
-```python
-from invokeai.app.invocations.panorama import LDRtoHDRInvocation
-
-invocation = LDRtoHDRInvocation(
-    image=your_image,
-    output_path="output.exr",
-    gamma=2.2,
-    brightness=1.0
-)
-result = invocation.invoke(context)
-```
-
-### Advanced Usage with GPU Acceleration
-
-For optimal performance with large images, you can enable GPU acceleration and customize processing options:
-
-```python
-invocation = EquirectangularToCubemapCrossInvocation(
-    image=your_image,
-    face_size=2048,
-    use_gpu=True,
-    use_ipp=True,
-    num_threads=8,
-    batch_size=64,
-    use_supersampling=True,
-    supersampling_rate=2,
-    use_adaptive=True
-)
-```
+Before
+![Screenshot 1](images/2.jpg)
+After
+![Screenshot 2](images/1.jpg)
 
 ## Technical Details
 
@@ -175,30 +110,3 @@ The codebase includes several optimization strategies:
    - Streaming large images
    - Batch processing for GPU operations
    - Efficient coordinate pre-calculation
-
-## Error Handling
-
-The package includes comprehensive error handling for:
-- Input validation
-- File I/O operations
-- GPU memory management
-- Resource cleanup
-- Graceful fallbacks for unavailable optimizations
-
-## Contributing
-
-When contributing to this codebase:
-
-1. Follow the existing code style and documentation patterns
-2. Add unit tests for new functionality
-3. Update documentation for API changes
-4. Test both CPU and GPU paths
-5. Verify memory handling for large images
-
-## License
-
-This package is part of the InvokeAI project and follows its licensing terms.
-
-## Acknowledgments
-
-This implementation builds on established panoramic processing techniques and optimizes them for modern hardware and the InvokeAI framework.
